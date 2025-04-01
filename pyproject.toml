@@ -1,44 +1,28 @@
-[build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "langchain-opengauss"
 version = "0.1.0"
 description = "openGauss vector store integration for LangChain"
+authors = []
 readme = "README.md"
-authors = [
-    { name = "mpb159753", email = "m.pb@msn.com" }
-]
-license = { text = "MIT" }
-keywords = ["opengauss", "vector-database", "langchain", "ai"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Topic :: Database",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-]
-requires-python = ">=3.8"
-dependencies = [
-    "langchain-core>=0.1.0",
-    "psycopg2-binary>=2.9.6",
-    "pydantic>=1.10.0"
-]
+repository = "https://github.com/mpb159753/langchain-opengauss"
+license = "MIT"
 
-[project.urls]
-Homepage = "https://github.com/mpb159753/langchain-opengauss"
-Repository = "https://github.com/mpb159753/langchain-opengauss"
+[tool.poetry.urls]
+"Source Code" = "https://github.com/mpb159753/langchain-opengauss"
 
-[tool.setuptools]
-# 只保留一个 packages 声明方式
-packages = ["langchain_opengauss"]
-include-package-data = true
+[tool.poetry.dependencies]
+python = "^3.9"
+langchain-core = ">=0.2.13,<0.4.0"
+psycopg2-binary = ">=2.9.6"
+pydantic = ">=2.9.0"
 
-[tool.setuptools.package-data]
-"*" = ["LICENSE", "README.md"]
+
+[tool.coverage.run]
+omit = ["tests/*"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.codespell]
+skip = '.git,*.pdf,*.svg,*.pdf,*.yaml,*.ipynb,poetry.lock,*.min.js,*.css,package-lock.json,example_data,_dist,examples,templates,*.trig'
