@@ -1,17 +1,17 @@
-# OpenGauss Vector Store for LangChain
+# openGauss Vector Store for LangChain
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-OpenGauss integration for LangChain providing scalable vector storage , powered by openGauss.
+openGauss integration for LangChain providing scalable vector storage and search capabilities, powered by openGauss.
 
 ## Features
 
-- 🚀 **High-performance vector search** using  [HNSW](https://docs.opengauss.org/zh/docs/7.0.0-RC1/docs/SQLReference/%E5%90%91%E9%87%8F%E7%B4%A2%E5%BC%95.html##IVFFlat) indexing
-- 🔧 **Auto-schema management** with table creation/initialization
-- 🛡️ **ACID-compliant** storage with openGauss
-- 📦 **Batched operations** for efficient document handling
-- 🔍 **Hybrid search** combining vector similarity and metadata filtering
-- 🧩 **LangChain compatible** API design
+- 🚀 **Multi-Index Support** - HNSW and IVFFLAT vector indexing algorithms
+- 📐 **Multiple Distance Metrics** - EUCLIDEAN/COSINE/MANHATTAN/NEGATIVE_INNER_PRODUCT
+- 🔧 **Auto-Schema Management** - Automatic table creation and validation
+- 🧮 **Dimension Validation** - Type-safe dimension constraints for different vector types
+- 🛡️ **ACID Compliance** - Transaction-safe operations with connection pooling
+- 🔀 **Hybrid Search** - Combine vector similarity with metadata filtering
 
 ## Installation
 
@@ -20,12 +20,13 @@ pip install langchain-opengauss
 ```
 
 **Prerequisites**:
-- Running openGauss instance (Docker recommended)
+- openGauss >= 7.0.0
 - Python 3.8+
+- psycopg2-binary
 
 ## Quick Start
 
-### 1. Start openGauss Docker Container
+### 1. Start openGauss Container
 ```bash
 docker run --name opengauss \
   --privileged=true \
@@ -38,86 +39,145 @@ docker run --name opengauss \
 ### 2. Basic Usage
 ```python
 from langchain_opengauss import OpenGauss, OpenGaussSettings
+from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 
-# Configuration
+# Configuration with validation
 config = OpenGaussSettings(
-    user="gaussdb",
-    password="MyStrongPass@123",
-    table_name="doc_store"
+    table_name="research_papers",
+    embedding_dimension=1536,
+    index_type="HNSW",
+    distance_strategy="COSINE"
 )
 
-# Initialize vector store
+# Initialize with OpenAI embeddings
 embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
 vector_store = OpenGauss(embedding=embeddings, config=config)
 
-# Add documents
+# Insert documents
 docs = [
-    Document(page_content="Quantum computing basics", metadata={"topic": "physics"}),
-    Document(page_content="Advanced machine learning", metadata={"topic": "ai"})
+    Document(page_content="Quantum computing basics", metadata={"field": "physics"}),
+    Document(page_content="Neural network architectures", metadata={"field": "ai"})
 ]
 vector_store.add_documents(docs)
 
 # Semantic search
-results = vector_store.similarity_search("computer science", k=2)
-for doc in results:
-    print(f"• {doc.page_content} [{doc.metadata}]")
+results = vector_store.similarity_search("deep learning models", k=1)
+print(f"Found {len(results)} relevant documents")
 ```
 
-## Configuration
+## Configuration Guide
 
-### OpenGaussSettings Parameters
+### Connection Settings
 | Parameter           | Default       | Description                          |
 |---------------------|---------------|--------------------------------------|
-| `host`              | localhost     | Database host address                |
-| `port`              | 5432          | Database port                        |
+| `host`              | localhost     | Database server address              |
+| `port`              | 5432          | Database server port                 |
 | `user`              | gaussdb       | Database username                    |
-| `password`          | -             | Database password                    |
+| `password`          | -             | Password with complexity requirements|
 | `database`          | postgres      | Default database name                |
 | `table_name`        | langchain_docs| Collection table name                |
-| `embedding_dimension` | 1536        | Vector dimension (OpenAI default)    |
-| `min_connections`   | 1             | Connection pool minimum              |
-| `max_connections`   | 5             | Connection pool maximum              |
+| `min_connections`   | 1             | Connection pool minimum size         |
+| `max_connections`   | 5             | Connection pool maximum size         |
+
+### Vector Configuration
+```python
+class OpenGaussSettings(BaseModel):
+    index_type: IndexType = IndexType.HNSW  # HNSW or IVFFLAT
+    vector_type: VectorType = VectorType.vector  # Currently supports float vectors
+    distance_strategy: DistanceStrategy = DistanceStrategy.COSINE
+    embedding_dimension: int = 1536  # Max 2000 for vector type
+```
+
+#### Supported Combinations
+| Vector Type | Dimensions | Index Types  | Supported Distance Strategies          |
+|-------------|------------|--------------|----------------------------------------|
+| vector      | ≤2000      | HNSW/IVFFLAT | COSINE/EUCLIDEAN/MANHATTAN/INNER_PROD  |
 
 ## Advanced Usage
 
-### Hybrid Search with Filters
+### Hybrid Search with Metadata
 ```python
+# Filter by metadata with vector search
 results = vector_store.similarity_search(
-    query="neural networks",
-    k=5,
-    filter={"category": "machine-learning"}
+    query="machine learning",
+    k=3,
+    filter={"publish_year": 2023, "category": "research"}
 )
 ```
 
-### ID Management Strategies
+### Index Management
 ```python
-# Custom IDs
-vector_store.add_documents(docs, ids=["doc1", "doc2"])
+# Create optimized HNSW index
+vector_store.create_hnsw_index(
+    m=24,           # Number of bi-directional links
+    ef_construction=128,  # Search scope during build
+    ef=64           # Search scope during queries
+)
 
-# Auto-generated UUIDs
-vector_store.add_documents(docs)  # Generates UUIDs automatically
-```
 
-### Performance Tuning
-```python
-# Batch insert with 100 documents per transaction
-vector_store.add_documents(large_docs, batch_size=100)
-
-# Adjust HNSW index parameters
-vector_store.create_hnsw_index(m=24, ef_construction=128)
 ```
 
 ## API Reference
 
 ### Core Methods
-- `add_documents()`: Insert documents with automatic embedding
-- `similarity_search()`: Basic vector similarity search
-- `similarity_search_with_score()`: Search with similarity scores
-- `delete()`: Remove documents by ID
-- `drop_table()`: Delete entire collection
+| Method                          | Description                                     |
+|---------------------------------|-------------------------------------------------|
+| `add_documents(docs, **kwargs)` | Insert documents with automatic embedding       |
+| `similarity_search(query, k)`  | Basic vector similarity search                  |
+| `similarity_search_with_score` | Search returning (document, similarity_score)  |
+| `delete(ids)`                  | Remove documents by IDs                         |
+| `drop_table()`                 | Delete entire collection                        |
+
+## Performance Tips
 
 
----
+### 1. **Index Tuning**
 
-**Note**: Requires openGauss 7.0+ with vector extension enabled.
+#### HNSW Index Optimization
+- `m` (max connections per layer)
+  - **Default**: 16
+  - **Range**: 2~100
+  - Tradeoff: Higher values improve recall but increase index build time and memory usage
+
+- `ef_construction` (construction search scope)
+  - **Default**: 64
+  - **Range**: 4~1000 (must ≥ 2*m)
+
+```python
+# Example HNSW configuration
+vector_store.create_hnsw_index(
+    m=16,                # Balance between recall and performance
+    ef_construction=64, # Ensure >2*m (48) and >ef_search
+)
+```
+
+#### IVFFLAT Index Optimization
+- `lists` 
+  - **Calculation**:
+    ```python
+    # Recommended formula
+    lists = min(
+        int(math.sqrt(total_rows)) if total_rows > 1e6 
+        else int(total_rows / 1000),
+        2000  # openGauss maximum limit
+    )
+    ```
+  - **Adjustment Guide**:
+    - Start with 1000 lists for 1M vectors
+    - 2000 lists for 10M+ vectors
+    - Monitor recall rate and adjust
+
+
+### 2. **Connection Pooling**
+   ```python
+   OpenGaussSettings(
+       min_connections=3,
+       max_connections=20
+   )
+   ```
+
+## Limitations
+
+- Vector type `bit` and `sparsevec` currently under development
+
