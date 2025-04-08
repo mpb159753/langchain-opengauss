@@ -32,7 +32,7 @@ docker run --name opengauss \
   --privileged=true \
   -d \
   -e GS_PASSWORD=MyStrongPass@123 \
-  -p 5432:5432 \
+  -p 8888:5432 \
   opengauss/opengauss-server:latest
 ```
 
