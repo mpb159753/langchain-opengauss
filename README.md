@@ -12,6 +12,7 @@
 - 🧮 **Dimension Validation** - Type-safe dimension constraints for different vector types
 - 🛡️ **ACID Compliance** - Transaction-safe operations with connection pooling
 - 🔀 **Hybrid Search** - Combine vector similarity with metadata filtering
+- 😀  **openGauss age Graph Support** - Graph store implementation for openGauss age
 
 ## Installation
 
@@ -191,3 +192,117 @@ vector_store.create_hnsw_index(
 
 - Vector type `bit` and `sparsevec` currently under development
 
+
+
+### 3. Start with openGaussAGEGraph
+
+#### 3.1. Create extension age in openGauss
+
+```shell
+#Enter docker container
+docker exec -it opengauss bash
+
+#Switch to omm user
+su omm
+
+#Connect to the database, and the OMM database is used by default
+gsql -r
+
+#Create the age plug-in on the OMM database
+create extension age;
+
+#Exit database connecting
+\q
+```
+
+#### 3.2. Basic Usage
+
+```python
+from langchain_core.documents import Document
+from langchain_experimental.graph_transformers import LLMGraphTransformer
+from langchain_opengauss import openGaussAGEGraph, OpenGaussSettings
+from langchain_community.llms import Tongyi
+from langchain_core.prompts import PromptTemplate
+from langchain.chains import GraphCypherQAChain
+from langchain_core.output_parsers import StrOutputParser
+import os
+
+#set api-key
+os.environ["DASHSCOPE_API_KEY"] = "sk-**"
+graph_llm =Tongyi(model="qwen-plus", temperature=0, base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
+
+llm_transformer = LLMGraphTransformer(
+    llm=graph_llm,
+    allowed_nodes=["Person", "Organization", "Location", "Award", "ResearchField"],
+    allowed_relationships = ["SPOUSE", "AWARD", "FIELD_OF_RESEARCH", "WORKS_AT", "IN_LOCATION"],
+)
+
+text = """
+Marie Curie, 7 November 1867 – 4 July 1934, was a Polish and naturalised-French physicist and chemist who conducted pioneering research on radioactivity.
+She was the first woman to win a Nobel Prize, the first person to win a Nobel Prize twice, and the only person to win a Nobel Prize in two scientific fields.
+Her husband, Pierre Curie, was a co-winner of her first Nobel Prize, making them the first-ever married couple to win the Nobel Prize and launching the Curie family legacy of five Nobel Prizes.
+She was, in 1906, the first woman to become a professor at the University of Paris.
+"""
+
+documents = [Document(page_content=text)]
+graph_documents = llm_transformer.convert_to_graph_documents(documents)
+
+conf = OpenGaussSettings{
+    database = "omm",				#Default database name
+    user = "gaussdb",				#Database username
+    password = "YourPassoword",	    #Password with complexity requirements
+    host = "Your IP",				#Database server address
+    port = 8888					#Database server port
+}
+graph=openGaussAGEGraph(graph_name='graphtest',conf=conf,create=True)
+graph.add_graph_documents(graph_documents)
+graph.refresh_schema()
+
+cypher_prompt = PromptTemplate(
+    template="""You are an expert in generating AGE Cypher queries.Use the following schema to generate a Cypher query to answer the given question.Do not include name, properties, or cypher.
+    Schema:{schema}
+    Question: {question}
+    Cypher Query:""",
+    input_variables=["schema", "question"],
+)
+
+chain = GraphCypherQAChain.from_llm(
+    graph_llm, graph=graph, verbose=True, allow_dangerous_requests=True, cypher_validation=True, return_intermediate_steps=True,cypher_prompt=cypher_prompt
+)
+
+question = "Who get Nobel Prize ?"
+result = chain.invoke({"query": question})
+
+prompt = PromptTemplate(
+    template="""You are an assistant for question-answering tasks. 
+    Use the following pieces of retrieved context from a graph database to answer the question. If you don't know the answer, just say that you don't know. 
+    Use two sentences maximum and keep the answer concise:
+    Question: {question} 
+    Graph Context: {graph_context}
+    Answer: 
+    """,
+    input_variables=["question", "graph_context"],
+)
+
+composite_chain = prompt | graph_llm |StrOutputParser()
+
+answer = composite_chain.invoke(
+    {"question": question, "graph_context": result}
+)
+print(answer)
+
+
+```
+
+
+
+### 3.3 API Reference
+
+#### Core Methods
+
+| Method                                                 | Description                                                  |
+| ------------------------------------------------------ | ------------------------------------------------------------ |
+| ` __init__(graph_name, conf, create) `                 | Create object of openGaussAGEGraph                           |
+| `_wrap_query(query: str, graph_name: str)`             | Convert a Cyper query to an openGauss Age compatible Sql Query. |
+| `add_graph_documents(graph_documents, include_source)` | insert a list of graph documents into the graph              |
+| `refresh_schema()`                                     | Refresh the graph schema information by updating the available labels, relationships, and properties |
