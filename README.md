@@ -51,7 +51,7 @@ config = OpenGaussSettings(
     table_name="research_papers",
     embedding_dimension=1536,
     index_type="HNSW",
-    distance_strategy="COSINE"
+    distance_strategy="COSINE",
 )
 
 # Initialize with OpenAI embeddings
@@ -74,16 +74,20 @@ print(f"Found {len(results)} relevant documents")
 
 ### Connection Settings
 
-| Parameter         | Default        | Description                           |
-|-------------------|----------------|---------------------------------------|
-| `host`            | localhost      | Database server address               |
-| `port`            | 8888           | Database server port                  |
-| `user`            | gaussdb        | Database username                     |
-| `password`        | -              | Password with complexity requirements |
-| `database`        | postgres       | Default database name                 |
-| `table_name`      | langchain_docs | Collection table name                 |
-| `min_connections` | 1              | Connection pool minimum size          |
-| `max_connections` | 5              | Connection pool maximum size          |
+| Parameter           | Default                 | Description                                            |
+|---------------------|-------------------------|--------------------------------------------------------|
+| `host`              | localhost               | Database server address                                |
+| `port`              | 8888                    | Database connection port                               |
+| `user`              | gaussdb                 | Database username                                      |
+| `password`          | -                       | Complex password string                                |
+| `database`          | postgres                | Default database name                                  |
+| `min_connections`   | 1                       | Connection pool minimum size                           |
+| `max_connections`   | 5                       | Connection pool maximum size                           |
+| `table_name`        | langchain_docs          | Name of the table for storing vector data and metadata |
+| `index_type`        | IndexType.HNSW          |Vector index algorithm type. Options: HNSW or IVFFLAT\nDefault is HNSW.|
+| `vector_type`       | VectorType.vector       |Type of vector representation to use. Default is Vector.|
+| `distance_strategy` | DistanceStrategy.COSINE |Vector similarity metric to use for retrieval. Options: euclidean (L2 distance), cosine (angular distance, ideal for text embeddings), manhattan (L1 distance for sparse data), negative_inner_product (dot product for normalized vectors).\n Default is cosine.|
+|`embedding_dimension`| 1536                    |Dimensionality of the vector embeddings.|
 
 ### Vector Configuration
 
@@ -110,7 +114,7 @@ class OpenGaussSettings(BaseModel):
 results = vector_store.similarity_search(
     query="machine learning",
     k=3,
-    filter={"publish_year": 2023, "category": "research"}
+    filter={"publish_year": 2023, "category": "research"},
 )
 ```
 
@@ -121,7 +125,7 @@ results = vector_store.similarity_search(
 vector_store.create_hnsw_index(
     m=24,  # Number of bi-directional links
     ef_construction=128,  # Search scope during build
-    ef=64  # Search scope during queries
+    ef=64,  # Search scope during queries
 )
 
 
@@ -130,14 +134,14 @@ vector_store.create_hnsw_index(
 ## API Reference
 
 ### Core Methods
+| Method                         | Description                                   |
+|--------------------------------|-----------------------------------------------|
+| `add_documents`                | Insert documents with automatic embedding     |
+| `similarity_search `           | Basic vector similarity search                |
+| `similarity_search_with_score` | Return (document, similarity_score) tuples   |
+| `delete`                       | Remove documents by ID list                  |
+| `drop_table`                   | Delete entire collection                     |
 
-| Method                          | Description                                   |
-|---------------------------------|-----------------------------------------------|
-| `add_documents(docs, **kwargs)` | Insert documents with automatic embedding     |
-| `similarity_search(query, k)`   | Basic vector similarity search                |
-| `similarity_search_with_score`  | Search returning (document, similarity_score) |
-| `delete(ids)`                   | Remove documents by IDs                       |
-| `drop_table()`                  | Delete entire collection                      |
 
 ## Performance Tips
 
@@ -168,10 +172,8 @@ vector_store.create_hnsw_index(
     - **Calculation**:
       ```python
       # Recommended formula
-      lists = min(
-          int(math.sqrt(total_rows)) if total_rows > 1e6 
-          else int(total_rows / 1000),
-          2000  # openGauss maximum limit
+      lists = min(int(math.sqrt(total_rows)) if total_rows > 1e6 else int(total_rows / 1000),
+           2000,  # openGauss maximum
       )
       ```
     - **Adjustment Guide**:
