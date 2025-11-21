@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langchain-opengauss"
-version = "0.1.3"
+version = "0.1.5"
 description = "openGauss vector store integration for LangChain"
 authors = []
 readme = "README.md"

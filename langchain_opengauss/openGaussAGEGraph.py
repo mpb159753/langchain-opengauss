@@ -22,7 +22,7 @@ class openGaussAGEGraph(AGEGraph):
     label_regex: Pattern = re.compile("[^0-9a-zA-Z\u4e00-\u9fff]+")
 
     def __init__(
-        self, graph_name: str, conf: OpenGaussSettings, create: bool = True
+        self, graph_name: str, conf: OpenGaussSettings, create: bool = True, **kwargs
     ) -> None:
         """Create a new openGaussAGEGraph instance."""
 
@@ -37,13 +37,15 @@ class openGaussAGEGraph(AGEGraph):
                 "Please install it with `pip install psycopg2-binary`."
             )
 
-        self.connection = psycopg2.connect(
-            host = conf.host,
-            port = conf.port,
-            user = conf.user,
-            password = conf.password,
-            database = conf.database
-        )
+        cfg = {
+            "host": conf.host,
+            "port": conf.port,
+            "database": conf.database,
+            "user": conf.user,
+            "password": conf.password,
+        }
+
+        self.connection = psycopg2.connect(**cfg, **kwargs)
 
         with self._get_cursor() as curs:
             # check if graph with name graph_name exists
